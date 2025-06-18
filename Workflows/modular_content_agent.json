@@ -1,0 +1,312 @@
+diff --git a//dev/null b/Workflows/modular_content_agent.json
+index 0000000000000000000000000000000000000000..6a2c1e30341a255e97e172f797e369ece0c2f770 100644
+--- a//dev/null
++++ b/Workflows/modular_content_agent.json
+@@ -0,0 +1,307 @@
++{
++  "name": "Modular Content Production Agent",
++  "nodes": [
++    {
++      "parameters": {
++        "path": "whatsapp-in",
++        "httpMethod": "POST"
++      },
++      "name": "WhatsApp Webhook",
++      "type": "n8n-nodes-base.webhook",
++      "typeVersion": 1,
++      "position": [
++        100,
++        300
++      ]
++    },
++    {
++      "parameters": {
++        "functionCode": "// Extract message text from WhatsApp webhook payload\nconst body = items[0].json;\nconst message = body.entry[0].changes[0].value.messages[0].text.body;\nitem.json.brief = message;\nreturn [item];"
++      },
++      "name": "Extract Brief",
++      "type": "n8n-nodes-base.function",
++      "typeVersion": 1,
++      "position": [
++        300,
++        300
++      ]
++    },
++    {
++      "parameters": {
++        "model": "gpt-3.5-turbo",
++        "prompt": "You are a classifier. Classify the following creative brief into one of: Blog post, Newsletter, Social media post, Video script. Only respond with the classification term.\nBrief: {{$json.brief}}"
++      },
++      "name": "Classify Brief",
++      "type": "n8n-nodes-base.openai",
++      "typeVersion": 1,
++      "position": [
++        500,
++        300
++      ],
++      "credentials": {
++        "openAiApi": {
++          "id": "OPENAI_CREDENTIAL_ID",
++          "name": "OpenAI Account"
++        }
++      }
++    },
++    {
++      "parameters": {
++        "dataType": "string",
++        "value1": "={{$json[\"choices\"][0][\"message\"][\"content\"].trim()}}",
++        "rules": [
++          {
++            "value2": "Blog post"
++          },
++          {
++            "value2": "Newsletter"
++          },
++          {
++            "value2": "Social media post"
++          },
++          {
++            "value2": "Video script"
++          }
++        ]
++      },
++      "name": "Switch by Content Type",
++      "type": "n8n-nodes-base.switch",
++      "typeVersion": 1,
++      "position": [
++        700,
++        300
++      ]
++    },
++    {
++      "parameters": {
++        "model": "gpt-3.5-turbo",
++        "prompt": "Write a blog post based on this brief: {{$json.brief}}"
++      },
++      "name": "Blog Writer",
++      "type": "n8n-nodes-base.openai",
++      "typeVersion": 1,
++      "position": [
++        900,
++        100
++      ],
++      "credentials": {
++        "openAiApi": {
++          "id": "OPENAI_CREDENTIAL_ID",
++          "name": "OpenAI Account"
++        }
++      }
++    },
++    {
++      "parameters": {
++        "model": "gpt-3.5-turbo",
++        "prompt": "Create a newsletter based on this brief: {{$json.brief}}"
++      },
++      "name": "Newsletter Generator",
++      "type": "n8n-nodes-base.openai",
++      "typeVersion": 1,
++      "position": [
++        900,
++        200
++      ],
++      "credentials": {
++        "openAiApi": {
++          "id": "OPENAI_CREDENTIAL_ID",
++          "name": "OpenAI Account"
++        }
++      }
++    },
++    {
++      "parameters": {
++        "model": "gpt-3.5-turbo",
++        "prompt": "Write social media copy based on this brief: {{$json.brief}}"
++      },
++      "name": "Social Media Copywriter",
++      "type": "n8n-nodes-base.openai",
++      "typeVersion": 1,
++      "position": [
++        900,
++        300
++      ],
++      "credentials": {
++        "openAiApi": {
++          "id": "OPENAI_CREDENTIAL_ID",
++          "name": "OpenAI Account"
++        }
++      }
++    },
++    {
++      "parameters": {
++        "model": "gpt-3.5-turbo",
++        "prompt": "Write a video script based on this brief: {{$json.brief}}"
++      },
++      "name": "Video Script Writer",
++      "type": "n8n-nodes-base.openai",
++      "typeVersion": 1,
++      "position": [
++        900,
++        400
++      ],
++      "credentials": {
++        "openAiApi": {
++          "id": "OPENAI_CREDENTIAL_ID",
++          "name": "OpenAI Account"
++        }
++      }
++    },
++    {
++      "parameters": {
++        "requestMethod": "POST",
++        "url": "https://api.video-generator.example.com/create",
++        "jsonParameters": true,
++        "options": {},
++        "bodyParametersJson": "{\n  \"script\": \"{{$json.choices[0].message.content}}\",\n  \"model_id\": \"VIDEO_MODEL_ID\"\n}"
++      },
++      "name": "Generate Video",
++      "type": "n8n-nodes-base.httpRequest",
++      "typeVersion": 1,
++      "position": [
++        1100,
++        400
++      ]
++    },
++    {
++      "parameters": {
++        "requestMethod": "POST",
++        "url": "https://graph.facebook.com/v17.0/PHONE_NUMBER_ID/messages",
++        "jsonParameters": true,
++        "options": {},
++        "bodyParametersJson": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"={{$json.entry[0].changes[0].value.messages[0].from}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{$json.result || $json.choices[0].message.content}}\" }\n}"
++      },
++      "name": "Send WhatsApp Message",
++      "type": "n8n-nodes-base.httpRequest",
++      "typeVersion": 1,
++      "position": [
++        1300,
++        300
++      ]
++    }
++  ],
++  "connections": {
++    "WhatsApp Webhook": {
++      "main": [
++        [
++          {
++            "node": "Extract Brief",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Extract Brief": {
++      "main": [
++        [
++          {
++            "node": "Classify Brief",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Classify Brief": {
++      "main": [
++        [
++          {
++            "node": "Switch by Content Type",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Switch by Content Type": {
++      "main": [
++        [
++          {
++            "node": "Blog Writer",
++            "type": "main",
++            "index": 0
++          }
++        ],
++        [
++          {
++            "node": "Newsletter Generator",
++            "type": "main",
++            "index": 0
++          }
++        ],
++        [
++          {
++            "node": "Social Media Copywriter",
++            "type": "main",
++            "index": 0
++          }
++        ],
++        [
++          {
++            "node": "Video Script Writer",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Blog Writer": {
++      "main": [
++        [
++          {
++            "node": "Send WhatsApp Message",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Newsletter Generator": {
++      "main": [
++        [
++          {
++            "node": "Send WhatsApp Message",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Social Media Copywriter": {
++      "main": [
++        [
++          {
++            "node": "Send WhatsApp Message",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Video Script Writer": {
++      "main": [
++        [
++          {
++            "node": "Generate Video",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Generate Video": {
++      "main": [
++        [
++          {
++            "node": "Send WhatsApp Message",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    }
++  },
++  "active": false
++}
